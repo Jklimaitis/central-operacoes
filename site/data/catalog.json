@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "items": [
+    {
+      "id": "central-observabilidade-inicial",
+      "module": "operacoes",
+      "title": "Central de operações: feed e monitoria inicial",
+      "summary": "O portal local passou a reunir publicações por módulo e estado das rotinas do Agente.",
+      "body": "Implementados: busca por nome e módulo, ordenação temporal, página dedicada, miniaturas de imagens e painel de estado dos cron jobs. Um coletor local consulta o ledger do Agente a cada minuto quando o usuário está conectado ao Windows. Saídas brutas e erros sensíveis continuam no histórico local do Agente; métricas não registradas não são estimadas.",
+      "timestamp": "2026-09-27T00:31:54.974132-03:00",
+      "relevant": true,
+      "media": [],
+      "url": "/publicacoes/central-observabilidade-inicial.html"
+    }
+  ]
+}

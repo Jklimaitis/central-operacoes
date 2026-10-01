@@ -39,4 +39,4 @@ Portal estático local para indexar publicações, rotinas, conteúdos e inciden
 
 ## Design
 
-Adaptação do sistema em https://getdesign.md/design-md/meta/DESIGN.md para uma superfície operacional: canvas branco, cinzas suaves, tinta escura, azul cobalto em detalhes, cantos amplos e botões pill. A fonte Optimistic VF é proprietária e não está incluída; usamos Helvetica/Arial.
+Adaptação do sistema utilizando modelos do https://getdesign.md/design-md/ para uma superfície operacional. Na fonte usamos Helvetica/Arial.

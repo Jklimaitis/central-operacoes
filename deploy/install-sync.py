@@ -1,7 +1,7 @@
 """Install minute-level Windows Task Scheduler sync for the active user.
 
-No password is stored. Runs while o usuário is signed into Windows, with network
-access to the private Git remote. After reboot, sign in to resume collection.
+No password is stored. Runs while the active user is signed into Windows, with
+network access to the configured Git remote. After reboot, sign in to resume collection.
 """
 from pathlib import Path
 import subprocess

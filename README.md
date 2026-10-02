@@ -1,41 +1,98 @@
 # Central de Operações
 
-Portal estático local para indexar publicações, rotinas, conteúdos e incidentes. O feed usa dados reais; não exibe contagens ou custos inventados. Não há cron jobs cadastrados nesta instalação no momento inicial.
+Portal estático para reunir publicações e acompanhar rotinas locais. Usa HTML, CSS, JavaScript e scripts Python, com nginx e autenticação Basic Auth no Ubuntu/WSL.
 
-## Fluxo de publicação
+Este repositório é um **esqueleto reutilizável**: o catálogo e o painel de jobs começam vazios, sem histórico de uma instalação particular. O código foi desenvolvido com assistência de IA; alterações precisam passar por revisão, testes e verificação do destino Git antes de serem publicadas.
 
-- A página inicial tem busca por nome/título/módulo, filtro de módulo e ordenação por data (mais recentes primeiro); miniatura no card para imagens publicadas. Publicações relevantes têm página HTML dedicada com texto e mídia embutida (imagens ou vídeos).
-- Prepare um JSON revisado **fora do repositório** com `id` (slug), `module` (`operacoes`, `rotinas`, `conteudos`, `dashboards`, `relatorios`, `pesquisas`), `title`, `summary`, `timestamp` com fuso ISO-8601, `relevant` (booleano), `body` (opcional) e `media` (lista de caminhos de arquivos locais). Informe `duration_seconds`, `model`, `tokens`, `cost_usd` somente se medidos/conhecidos. Ex.: `python scripts/publish.py caminho/para/entrada-revisada.json`. O comando copia mídia com nome hash, cria a publicação, testa, commita e envia ao Git privado.
-- Revise privacidade e segredos antes de publicar. Mídia enviada ao Git privado e servida sob Basic Auth; não use imagens/dados sensíveis sem autorização. Hashes identificam arquivos imutáveis; dados e HTML continuam revalidados. O catálogo preserva todas as entradas e ordena por instante UTC decrescente.
-- Sem domínio, os módulos ficam em caminhos de `localhost:8088/`. Para futuros `briefing.DOMINIO.com`, `ads.DOMINIO.com` e `gestao.DOMINIO.com`, será necessário domínio, DNS, TLS e configuração de proxy; não estão ativos agora.
+## O que o projeto faz
 
-## Cron e monitoria
+- Organiza publicações por módulo, com busca por título/nome/módulo e ordenação por data.
+- Cria páginas dedicadas para publicações relevantes e incorpora imagens ou vídeos.
+- Copia mídia com nomes derivados de hash, evitando colisões e preservando arquivos imutáveis.
+- Espelha metadados de execuções de cron a partir de um ledger compatível, sem copiar prompts, saídas brutas ou erros sensíveis.
+- Usa revalidação de cache para páginas/dados e referências CSS/JS versionadas por commit.
 
-- `python deploy/install-sync.py` instala a tarefa **TarefaSync** no Agendador do Windows. Ela consulta o ledger `executions.db` e os jobs do perfil Agente padrão **a cada minuto enquanto o usuário está conectado ao Windows**. Cada execução terminal (concluída, falha ou desconhecida) vira uma publicação deduplicada, e o painel mostra estado, falhas, execuções em curso e próxima execução dos jobs.
-- Cada alteração detectada é testada, commitada e enviada ao repositório privado por `scripts/release.py`; novas publicações aparecem após o próximo ciclo e atualização automática da página. O primeiro ciclo também indexa execuções anteriores disponíveis no ledger.
-- Por segurança, o espelho copia apenas metadados de execução: nunca copia prompts, saída bruta ou erros que possam conter segredos. O histórico completo permanece no Agente: `ferramenta de cron do agente` e `~/.agente/cron/output/` (equivalente do perfil ativo). Modelo é mostrado quando registrado no job; tokens/custos sem fonte confiável aparecem como não informados.
-- Se a tarefa falhar, consulte `%LOCALAPPDATA%\\agente\\central-operacoes-sync.log` e `schtasks /query /tn TarefaSync /v /fo list`. Como o coletor depende da sessão do Windows, quando o PC estiver desligado/desconectado não há sincronização. O gateway Agente precisa estar ativo para executar cron jobs (`status do agente de cron`).
-- Outros trabalhos do Agente **não são capturados automaticamente** neste estágio: publique entregas relevantes com `scripts/publish.py`. Subdomínios, captura integral de passos, telemetria de tokens/custo de todas as chamadas e alertas externos requerem integrações futuras; não confunda ausência de card com ausência de atividade.
+O portal não tem backend HTTP próprio nem banco de dados de publicações: lê arquivos JSON. O coletor depende do formato esperado de `executions.db` e dos arquivos de jobs, não é um conector universal para qualquer agente. Tokens, custos e duração só aparecem quando há uma fonte real.
 
-## Ambiente local
+## Configuração
 
-- URL: `http://localhost:8088/` (nginx no Ubuntu/WSL; WSL2 em modo NAT encaminha o localhost do Windows para a porta 8088). O processo escuta nas interfaces **da VM WSL**, protegidas por Basic Auth; não configure portproxy/firewall para expor a porta à rede externa.
-- Usuário HTTP: `usuario`. O arquivo `~/.config/central_operacoes_agente/credentials` existia na instalação inicial, mas pode ter sido removido após a troca da senha. A autenticação efetiva está no hash de `/etc/nginx/central_operacoes.htpasswd`; a senha atual não pode ser lida desse hash. Nunca coloque senha no Git.
-- Para iniciar nginx: `wsl -d Ubuntu -u root -- nginx` (ou `sudo nginx` dentro do Ubuntu).
-- Para validar nginx: `wsl -d Ubuntu -u root -- nginx -t`.
-- Para trocar a senha sem expô-la na linha de comando: no Ubuntu execute `sudo htpasswd -B /etc/nginx/central_operacoes.htpasswd usuario`, digite e confirme a senha nos prompts ocultos. Não é necessário recarregar o nginx. Evite reutilizar uma senha compartilhada em chat.
-- Sem VPS/domínio/TLS neste estágio. Para publicar futuramente, configure domínio, HTTPS e revise políticas de acesso.
+| Variável | Finalidade | Padrão |
+|---|---|---|
+| `CENTRAL_HTTP_USER` | Nome do usuário de Basic Auth na primeira instalação | `central_user` |
+| `CENTRAL_OS_USER` | Conta Linux que recebe as credenciais locais | `SUDO_USER` ou a conta do processo |
+| `CENTRAL_GIT_REMOTE` | URL exata do `origin` autorizado para release | Sem padrão: envio recusado até configurar |
+| `HERMES_HOME` | Diretório do agente/ledger consultado por `sync_cron.py` | `%LOCALAPPDATA%/agente` |
+
+`deploy/setup-local.py` calcula o caminho de `site/` a partir do checkout e grava a configuração renderizada **fora do Git**. Não é necessário criar uma conta Linux chamada `usuario` nem editar o template com um caminho pessoal. Por segurança, caminhos de instalação contendo `$` são recusados, pois o nginx os interpretaria como variáveis.
+
+As variáveis precisam estar disponíveis ao processo que as usa. Para o Agendador do Windows, configure-as no ambiente do usuário antes de instalar a tarefa. Definir uma variável apenas no shell atual não a disponibiliza à tarefa.
+
+## Instalação local
+
+Requisitos: Python 3, Git e, no Ubuntu/WSL, nginx e `htpasswd` (pacote `apache2-utils`). Execute os comandos Linux na raiz do checkout acessível ao Ubuntu:
+
+```bash
+python3 -m unittest discover -s tests -v
+sudo env CENTRAL_OS_USER="$(id -un)" python3 deploy/setup-local.py
+```
+
+O instalador gera uma senha na primeira instalação, sem imprimi-la, e guarda as credenciais em `~/.config/central_operacoes_agente/credentials`, fora do repositório, com permissão `0600`. A autenticação efetiva usa `/etc/nginx/central_operacoes.htpasswd`. O instalador não troca senhas já existentes; alterar `CENTRAL_HTTP_USER` sozinho não migra uma instalação antiga.
+
+- URL local: `http://localhost:8088/`.
+- Validar configuração: `sudo nginx -t`.
+- Iniciar nginx, se necessário: `sudo nginx`.
+- Alterar a senha sem colocá-la na linha de comando: `sudo htpasswd -B /etc/nginx/central_operacoes.htpasswd central_user`, substituindo o usuário se você configurou outro.
+
+No WSL2 em modo NAT, o nginx escuta nas interfaces da VM para permitir o encaminhamento de localhost do Windows. Basic Auth não substitui HTTPS: não exponha essa porta à rede externa com portproxy/firewall sem rever a instalação. Domínio, TLS e subdomínios não estão configurados neste esqueleto.
+
+## Publicação e release
+
+Prepare um JSON revisado **fora do repositório**, com `id` (slug), `module` (`operacoes`, `rotinas`, `conteudos`, `dashboards`, `relatorios` ou `pesquisas`), `title`, `summary`, `timestamp` ISO-8601 com fuso, `relevant` (booleano), `body` opcional e `media` (lista de caminhos de arquivos locais). Informe métricas somente quando medidas.
+
+Antes de qualquer envio, confira o destino e autorize sua URL exata. Exemplo de configuração no shell Linux:
+
+```bash
+git remote get-url origin
+export CENTRAL_GIT_REMOTE="$(git remote get-url origin)"
+python3 scripts/publish.py caminho/para/entrada-revisada.json
+# Para alterações gerais, após revisão do diff:
+python3 scripts/release.py "Descrição da alteração"
+```
+
+**Esses comandos fazem commit e push.** `release.py` recusa o envio quando `CENTRAL_GIT_REMOTE` está ausente ou não corresponde ao `origin`. Atribuir a variável não substitui a revisão do destino. No modo geral, o script inclui todas as alterações não ignoradas; mantenha trabalhos não relacionados fora desse checkout.
+
+Um repositório público expõe os arquivos publicados independentemente do Basic Auth local. Para usar dados operacionais privados, configure uma cópia com remoto privado. Nunca publique credenciais, prompts, saídas brutas, erros sensíveis ou mídia sem autorização.
+
+## Cron e monitoria (opcionais)
+
+`python deploy/install-sync.py`, executado no Windows, instala a tarefa **AgenteCentralSync**. Ela consulta o ledger `executions.db` e os arquivos de jobs a cada minuto enquanto o usuário está conectado. Execuções terminais viram publicações deduplicadas; o painel mostra estado dos jobs. O primeiro ciclo também indexa execuções anteriores disponíveis no ledger.
+
+A instalação da tarefa é opcional e **não foi realizada para preparar este esqueleto**. Configure o diretório do agente e o remoto adequado antes de ativá-la. Alterações detectadas passam pelos testes e por `scripts/release.py`; sem remoto autorizado, o envio é recusado.
+
+- Consultar a tarefa: `schtasks /query /tn AgenteCentralSync /v /fo list`.
+- Log do coletor: `%LOCALAPPDATA%/agente/central-operacoes-sync.log`.
+- Sem sessão Windows ativa, não há sincronização. O agente precisa estar ativo para executar seus próprios jobs.
+- Outros trabalhos não são capturados automaticamente: publique entregas relevantes com `scripts/publish.py`.
+
+## Testes
+
+```bash
+python3 -m unittest discover -s tests -v
+# Verificar também que o esqueleto ainda não tem histórico de uso:
+CENTRAL_CHECK_TEMPLATE_DATA=1 python3 -m unittest discover -s tests -v
+```
+
+A verificação de catálogo vazio é opt-in, para não bloquear publicações legítimas depois da instalação. Os testes do instalador usam APIs Linux e devem rodar no Ubuntu/WSL.
 
 ## Estrutura
 
-- `site/` — HTML, CSS, JS e futuro diretório `data/`; servido pelo nginx.
-- `deploy/nginx-local.conf` — Basic Auth, ETag e revalidação sem cache para HTML/CSS/JS/data; cache curto apenas para imagens imutáveis.
-- `scripts/release.py` — registra alterações no Git, carimba CSS/JS com SHA de commit, testa e faz push.
-- `tests/` — verificações do portal.
-
-## Regra obrigatória de atualização
-
-**Toda modificação, inclusão ou remoção no projeto deve ser commitada e enviada ao repositório privado** `seu-usuario/seu-repo`. Depois de alterar, execute `python scripts/release.py "Descrição da alteração"`; confirme o push e o carregamento local. Não versionar credenciais, `.htpasswd`, tokens ou dados privados.
+- `site/` — portal estático, catálogo JSON, status e publicações.
+- `scripts/portal.py` — validação de entradas, geração de páginas e coleta de metadados.
+- `scripts/publish.py` — publicação de conteúdo revisado.
+- `scripts/sync_cron.py` — espelhamento opcional de execuções.
+- `scripts/release.py` — testes, commits, versionamento de assets e push protegido por remoto explícito.
+- `deploy/` — template nginx, instalação local e tarefa Windows opcional.
+- `tests/` — testes do portal, observabilidade e configuração do esqueleto.
 
 ## Design
 

@@ -5,6 +5,7 @@ Never includes local credentials. The asset commit precedes the HTML stamp commi
 because a commit cannot contain its own final SHA.
 """
 from pathlib import Path
+import os
 import re
 import subprocess
 import sys
@@ -26,14 +27,19 @@ def commit_if_staged(message: str) -> bool:
     return True
 
 
+def remote_is_allowed(remote: str) -> bool:
+    expected = os.environ.get("CENTRAL_GIT_REMOTE", "").strip()
+    return bool(expected) and remote == expected
+
+
 def main() -> int:
     cron_sync = len(sys.argv) == 3 and sys.argv[2] == '--cron-sync'
     if (len(sys.argv) not in (2, 3) or not sys.argv[1].strip()
             or (len(sys.argv) == 3 and not cron_sync)):
         print('Uso: python scripts/release.py "Descrição" [--cron-sync]', file=sys.stderr)
         return 2
-    if not git("remote", "get-url", "origin").endswith("seu-usuario/seu-repo.git"):
-        print("Recusado: origin não é o repositório esperado.", file=sys.stderr)
+    if not remote_is_allowed(git("remote", "get-url", "origin")):
+        print("Recusado: configure CENTRAL_GIT_REMOTE com a URL exata do origin autorizado.", file=sys.stderr)
         return 2
     if cron_sync:
         # The minute-level observer must never commit unrelated user work-in-progress.

@@ -101,7 +101,7 @@
   function renderStatus(jobs) {
     status.replaceChildren();
     if (!jobs.length) {
-      status.append(el('p', 'empty-panel', 'Nenhum cron job configurado no Agente. Novas rotinas aparecerão aqui após o cadastro.'));
+      status.append(el('p', 'empty-panel', 'Nenhum cron job ativo no momento. O coletor de metadados foi removido; novas rotinas aparecerão aqui após configuração.'));
       return;
     }
     const list = el('div', 'job-list');

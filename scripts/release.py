@@ -59,6 +59,13 @@ def main() -> int:
         if basename in {".env", "credentials", "credentials.txt"} or basename.endswith(".htpasswd"):
             print(f"Recusado: credencial em staged: {name}", file=sys.stderr)
             return 2
+    # Avisar se há arquivos fora do escopo esperado
+    ALLOWED_PREFIXES = ("site/", "scripts/", "tests/", "deploy/")
+    ALLOWED_FILES = {"AGENTS.md", "README.md", ".gitignore"}
+    for name in staged:
+        top = name.split("/")[0] + "/" if "/" in name else name
+        if top not in ALLOWED_PREFIXES and name not in ALLOWED_FILES:
+            print(f"Aviso: arquivo fora do escopo esperado: {name}", file=sys.stderr)
     commit_if_staged(sys.argv[1].strip())
     if not cron_sync:
         version = git("rev-parse", "--short=8", "HEAD")
